@@ -1,2 +1,2 @@
-# colliders
-Bell collider for Maya
+# Colliders
+
