@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.0)
 
 if(CMAKE_CONFIGURATION_TYPES)
    set(CMAKE_CONFIGURATION_TYPES Debug Release RelWithDebInfo)
@@ -12,7 +12,7 @@ if (NOT CMAKE_BUILD_TYPE)
 endif ()
 
 project (colliders) 
-set(CMAKE_MODULE_PATH $ENV{MYTONA_PATH}/resources/cpp/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_SOURCE_DIR}/cmake)
 SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # Packages
