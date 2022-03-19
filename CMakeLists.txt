@@ -32,9 +32,7 @@ set(sources
 
 add_library(colliders SHARED ${sources})
 
-target_include_directories(colliders PUBLIC 
-  ${typeIdDir} 
-  ${MAYA_INCLUDE_DIR})
+target_include_directories(colliders PUBLIC ${MAYA_INCLUDE_DIR})
 
 target_link_libraries( 
   colliders 
