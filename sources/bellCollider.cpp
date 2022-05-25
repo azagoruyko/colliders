@@ -29,6 +29,8 @@
 
 #include <tbb/parallel_for.h>
 
+#include <mytona_mtypeids.h>
+
 #include "bellCollider.h"
 #include "utils.hpp"
 
@@ -52,21 +54,13 @@ MObject BellCollider::attr_falloffMaxDistance;
 MObject BellCollider::attr_distancePower;
 MObject BellCollider::attr_positionCount;
 MObject BellCollider::attr_drawColor;
-MObject BellCollider::attr_drawInXRay;
+MObject BellCollider::attr_drawOpacity;
 MObject BellCollider::attr_outputPositions;
 MObject BellCollider::attr_outputRotations;
 MObject BellCollider::attr_outputCurve;
 
 MString BellCollider::drawDbClassification = "drawdb/geometry/bellCollider";
 MString BellCollider::drawRegistrantId = "collidersPlugin";
-
-template<typename T>
-T clamp(const T& v, const T& l, const T& h)
-{
-    if (v < l) return l;
-    if (v > h) return h;
-    return v;
-}
 
 MObject makeBellMesh(const MMatrix& matrix, unsigned int axis, unsigned int numSides, double height = 1, double bottomRadius = 1, double topRadius = 1)
 {
@@ -76,7 +70,7 @@ MObject makeBellMesh(const MMatrix& matrix, unsigned int axis, unsigned int numS
     MPointArray vertexArray;
     MIntArray polygonCounts, polygonConnects;
 
-    vertexArray.append(MPoint(0, 0, 0));
+    vertexArray.append(MPoint(0, 0, 0) * matrix);
 
     // bottom
     for (int i = 0; i < numSides; i++)
@@ -316,15 +310,14 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
     auto outputRotationsHandle = dataBlock.outputArrayValue(attr_outputRotations);
 
     const MVector color = dataBlock.inputValue(attr_drawColor).asVector();
-    const bool drawInXRay = dataBlock.inputValue(attr_drawInXRay).asBool();
+    const float drawOpacity = dataBlock.inputValue(attr_drawOpacity).asFloat();
 
     const MPoint bell_translate = taxis(bellMatrix);
     const MVector bellAxis = maxis(bellMatrix, BELL_AXIS);
     const MVector bellNormal = bellAxis.normal();
     const Plane bellPlane(bell_translate, BELL_AXIS_SIGN * bellNormal);
 
-    drawData.color = MColor(color.x, color.y, color.z);
-    drawData.drawInXRay = drawInXRay;
+    drawData.color = MColor(color.x, color.y, color.z, drawOpacity);
     drawData.bellCenter = bell_translate;
     drawData.collisionPointBellList.clear();
     drawData.collisionPointRingList.clear();
@@ -364,6 +357,8 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
         ringMatrixHandle.jumpToElement(i);
 
         const MMatrix ringMatrix = ringMatrixHandle.inputValue().asMatrix();
+        const MMatrix ringMatrixInverse = ringMatrix.inverse();
+
         const MVector ringDirection = maxis(ringMatrix, RING_AXIS) * RING_AXIS_SIGN;
 
         const MPoint ring_translate_proj = bellPlane.projectPoint(taxis(ringMatrix));
@@ -414,11 +409,11 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                 const double linePointCoeff = ringNormal * bellNormal > 0 ? 1 : -1;
 
                 const MVector ring_proj = ringPlane.projectVector(ringDirection_proj * linePointCoeff);
-                const double delta = ring_proj.length() / (ring_proj * ringMatrix.inverse()).length();
+                const double delta = ring_proj.length() / (ring_proj * ringMatrixInverse).length();
                 const MVector ring_proj_scaled = ring_proj.normal() * delta; // scale vector
                 const MPoint linePoint = ring_translate + ring_proj_scaled;
 
-                const MPointArray sphereLinePoints = findSphereLineIntersection(linePoint, ringDirection, bell_translate, (collisionPointBell - bell_translate).length());
+                const MPointArray sphereLinePoints = findSphereLineIntersection(linePoint, ringDirection, bell_translate, bellAxis.length());
 
                 for (int k = 0; k < sphereLinePoints.length(); k++)
                 {
@@ -435,10 +430,13 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
             const bool collisionOccured = (collisionPointBell - collisionPointRing) * ringDirection_proj < 0 || ringNormal * bellNormal < 0;
             if (collisionOccured)
             {
-                MTransformationMatrix bellMatrixFn(bellMatrix);
+                MTransformationMatrix rotationMatrixFn;
+                rotationMatrixFn.setTranslation(bell_translate, MSpace::kWorld);
+                const MMatrix rotateMatrixInverse = rotationMatrixFn.asMatrixInverse();
+
                 const MQuaternion quat(collisionPointBell - bell_translate, collisionPointRing - bell_translate, 1);
-                bellMatrixFn.rotateBy(quat, MSpace::kTransform);
-                const MMatrix rotateMatrix = bellMatrixFn.asMatrix();
+                rotationMatrixFn.rotateBy(quat, MSpace::kTransform);
+                const MMatrix rotateMatrix = rotationMatrixFn.asMatrix();
 
                 // bell top deformation
                 tbb::parallel_for(tbb::blocked_range<int>(bellSubdivision + 1, bellPoints.length()), [&](tbb::blocked_range<int>& r)
@@ -458,13 +456,13 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                                 const double d2 = findDistance(neighbours, nearestBellVertices, collisionPointBell, baseBellPoints, i, false);
                                 weight = 1 - clamp<double>(pow(min(d1, d2), distancePower) / falloffMaxDistance, 0, 1);
                             }
-                                
+                            
                             if (weight > falloff)
                             {
                                 weight = (weight - falloff) / (1.0 - falloff);
 
-                                const MPoint p = bellPoints[i] * bellMatrixInverse * rotateMatrix;
-                                bellPoints[i] = p * weight + bellPoints[i] * (1.0 - weight);
+                                const MPoint rp = bellPoints[i] * rotateMatrixInverse * rotateMatrix;
+                                bellPoints[i] = rp * weight + bellPoints[i] * (1.0 - weight);
                             }
                         }
                     });
@@ -664,9 +662,11 @@ MStatus BellCollider::initialize()
     nAttr.setKeyable(true);
     addAttribute(attr_drawColor);
 
-    attr_drawInXRay = nAttr.create("drawInXRay", "drawInXRay", MFnNumericData::kBoolean, false);
+    attr_drawOpacity = nAttr.create("drawOpacity", "drawOpacity", MFnNumericData::kFloat, 0.3);
+    nAttr.setMin(0);
+    nAttr.setMax(1);
     nAttr.setKeyable(true);
-    addAttribute(attr_drawInXRay);
+    addAttribute(attr_drawOpacity);
 
     attr_positionCount = nAttr.create("positionCount", "positionCount", MFnNumericData::kInt, 6);
     nAttr.setMin(2);
@@ -700,7 +700,7 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_distancePower, attr_outputPositions);
     attributeAffects(attr_positionCount, attr_outputPositions);
     attributeAffects(attr_drawColor, attr_outputPositions);
-    attributeAffects(attr_drawInXRay, attr_outputPositions);
+    attributeAffects(attr_drawOpacity, attr_outputPositions);
 
     attributeAffects(attr_bellMatrix, attr_outputRotations);
     attributeAffects(attr_ringMatrix, attr_outputRotations);
@@ -715,7 +715,7 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_distancePower, attr_outputRotations);
     attributeAffects(attr_positionCount, attr_outputRotations);
     attributeAffects(attr_drawColor, attr_outputRotations);
-    attributeAffects(attr_drawInXRay, attr_outputRotations);
+    attributeAffects(attr_drawOpacity, attr_outputRotations);
 
     attributeAffects(attr_bellMatrix, attr_outputCurve);
     attributeAffects(attr_ringMatrix, attr_outputCurve);
@@ -729,7 +729,7 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_falloffMaxDistance, attr_outputCurve);
     attributeAffects(attr_distancePower, attr_outputCurve);
     attributeAffects(attr_drawColor, attr_outputCurve);
-    attributeAffects(attr_drawInXRay, attr_outputCurve);
+    attributeAffects(attr_drawOpacity, attr_outputCurve);
 
     return MS::kSuccess;
 }
@@ -763,16 +763,15 @@ void drawMesh(MHWRender::MUIDrawManager& drawManager, const MObject& mesh, const
     meshFn.getPoints(points);
 
     //MFloatVectorArray meshNormals;
-    //meshFn.getVertexNormals(false, meshNormals);
+    //meshFn.getVertexNormals(true, meshNormals);
 
-    MFloatPointArray positions;
-    MColorArray colors;
+    MFloatPointArray positions(triangleIndices.length());
+    MColorArray colors(triangleIndices.length(), color);
     //MFloatVectorArray normals;
 
     for (int i = 0; i < triangleIndices.length(); i++)
     {
-        positions.append(points[triangleIndices[i]]);
-        colors.append(color);
+        positions[i] = points[triangleIndices[i]];
         //normals.append(meshNormals[triangleIndices[i]]);
     }
 
@@ -781,22 +780,20 @@ void drawMesh(MHWRender::MUIDrawManager& drawManager, const MObject& mesh, const
 
 void BellCollider::drawUI(MHWRender::MUIDrawManager& drawManager)
 {
-    if (drawData.drawInXRay)
-        drawManager.beginDrawInXray();
+    //drawManager.beginDrawInXray();
 
-    //drawMesh(drawManager, drawData.bellMesh, MColor(drawData.color));
-    drawManager.setColor(drawData.color);
-    //drawManager.setColor(MColor(0, 0, 0));
+    drawMesh(drawManager, drawData.bellMesh, drawData.color);
+    drawManager.setColor(MColor(0, 0, 0));
     drawCylinder(drawManager, drawData.bellMesh); // wireframe
 
     for (const auto& m : drawData.ringMeshList)
     {
-        //drawMesh(drawManager, m, MColor(drawData.color));
-        //drawManager.setColor(MColor(0, 0, 0));
+        drawMesh(drawManager, m, drawData.color * 0.5);
+        drawManager.setColor(MColor(0, 0, 0));
         drawCylinder(drawManager, m); // wireframe
     }
 
-    //drawManager.setColor(drawData.color);
+    drawManager.setColor(MColor(0,0,0));
     drawManager.setPointSize(5);
 
     for (const auto& p : drawData.collisionPointBellList)
@@ -808,8 +805,7 @@ void BellCollider::drawUI(MHWRender::MUIDrawManager& drawManager)
     for (int i = 0; i < drawData.ringDirectionList.size();i++)
         drawManager.line(drawData.ringPositionList[i], drawData.ringPositionList[i] + drawData.ringDirectionList[i]);
 
-    if (drawData.drawInXRay)
-        drawManager.endDrawInXray();
+    //drawManager.endDrawInXray();
 }
 
 MUserData* BellColliderDrawOverride::prepareForDraw(

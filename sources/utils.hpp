@@ -44,13 +44,21 @@ public:
     };
 };
 
+template<typename T>
+T clamp(const T& v, const T& l, const T& h)
+{
+    if (v < l) return l;
+    if (v > h) return h;
+    return v;
+}
+
 inline MVector maxis(const MMatrix& mat, unsigned int index) { return MVector(mat[index][0], mat[index][1], mat[index][2]); }
 inline MVector xaxis(const MMatrix &mat) { return maxis(mat, 0); }
 inline MVector yaxis(const MMatrix& mat) { return maxis(mat, 1); }
 inline MVector zaxis(const MMatrix& mat) { return maxis(mat, 2); }
 inline MPoint taxis(const MMatrix& mat) { return maxis(mat, 3); }
 
-inline MMatrix& set_maxis(MMatrix& mat, const unsigned int a, const MVector& v)
+inline MMatrix& set_maxis(MMatrix& mat, unsigned int a, const MVector& v)
 {
     mat[a][0] = v.x;
     mat[a][1] = v.y;
@@ -58,7 +66,7 @@ inline MMatrix& set_maxis(MMatrix& mat, const unsigned int a, const MVector& v)
     return mat;
 }
 
-MPointArray findSphereLineIntersection(const MPoint &linePoint, const MVector &lineDirection, const MPoint &sphereCenter, double sphereRadius)
+inline MPointArray findSphereLineIntersection(const MPoint &linePoint, const MVector &lineDirection, const MPoint &sphereCenter, double sphereRadius)
 {
     MVector lineVector = lineDirection.normal();
 

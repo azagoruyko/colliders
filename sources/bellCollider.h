@@ -18,7 +18,6 @@ struct DrawData
 	vector<MPoint> ringPositionList;
 	MPoint bellCenter;
 	MColor color;
-	bool drawInXRay;
 };
 
 class BellCollider : public MPxLocatorNode
@@ -42,7 +41,7 @@ public:
 	static MObject attr_distancePower;
 	static MObject attr_positionCount;
 	static MObject attr_drawColor;
-	static MObject attr_drawInXRay;
+	static MObject attr_drawOpacity;
 	static MObject attr_outputPositions;
 	static MObject attr_outputRotations;
 	static MObject attr_outputCurve;
