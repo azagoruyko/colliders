@@ -413,7 +413,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                 const MVector ring_proj_scaled = ring_proj.normal() * delta; // scale vector
                 const MPoint linePoint = ring_translate + ring_proj_scaled;
 
-                const MPointArray sphereLinePoints = findSphereLineIntersection(linePoint, ringDirection, bell_translate, bellAxis.length());
+                const MPointArray sphereLinePoints = findSphereLineIntersection(linePoint, ringDirection, bell_translate, (collisionPointBell - ring_translate).length());
 
                 for (int k = 0; k < sphereLinePoints.length(); k++)
                 {
