@@ -8,7 +8,7 @@ Youtube: https://www.youtube.com/watch?v=89Dbd-n8EzY
 
 ## How to run
 #### Compile C++ plugin for Maya version you want.
-You need Visual Studio and CMake to do this. You can find precompiled plugins for Maya in *plugins* folder.
+You need Visual Studio and CMake to do this. 
 
 #### Python script to create Bell Collider node with some bell rings.
 ```python
