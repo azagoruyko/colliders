@@ -229,42 +229,6 @@ MObject makeBellCurve(const MPointArray &points, int bellSubdivision, bool use_b
     return curveData;
 }
 
-typedef enum {Scalar=0, Distance} FalloffMode;
-
-struct VertexNeighbours
-{
-    int left{ -1 };
-    int right{ -1 };
-};
-
-// distance calculation
-double findDistance(
-    const map<int, VertexNeighbours> & neighbours, 
-    const set<int>& stopVertices, 
-    const MPoint &finalPoint, 
-    const MPointArray &bellPoints, 
-    int vertexIndex, 
-    bool doMoveRight)
-{
-    double d = 0;
-    int currentIdx = vertexIndex;
-    while (true)
-    {
-        // stop when we bumped into vertices from nearestBellVertices
-        if (stopVertices.find(currentIdx) != stopVertices.end())
-        {
-            d += (bellPoints[currentIdx] - finalPoint).length();
-            break;
-        }
-
-        const int nextIdx = doMoveRight ? neighbours.at(currentIdx).right : neighbours.at(currentIdx).left;
-        d += (bellPoints[currentIdx] - bellPoints[nextIdx]).length();
-        currentIdx = nextIdx;
-    }
-
-    return d;
-};
-
 MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
 {
     if (plug != attr_outputPositions && plug != attr_outputRotations && plug != attr_outputCurve)
@@ -334,8 +298,6 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
 
         MPointArray bellPoints = baseBellPoints;
 
-        MObject ringMesh = makeBellMesh(ringMatrix, 1, ringSubdivision, 1); // Y axis       
-
         if (ringDirection_proj.length() > 1e-3)
         {
             const MPointArray hitPoints = findSphereLineIntersection(ring_translate_proj * bellMatrixInverse, ringDirection_proj * bellMatrixInverse, MPoint(0,0,0), 1.001);
@@ -366,7 +328,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
             else
                 MGlobal::displayError(MFnDependencyNode(thisMObject()).name() + ": no hits with ringMatrix[" + MSTR(i) + "]");            
 
-            const bool collisionOccured = (collisionPointBell - collisionPointRing) * ringDirection_proj < 0 || ringNormal * bellNormal < 0;
+            const bool collisionOccured = bellPlane.distance(collisionPointRing) < bellPlane.distance(collisionPointBell);
             if (collisionOccured)
             {     
                 
@@ -378,6 +340,8 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                 rotationMatrixFn.rotateBy(quat, MSpace::kTransform);
                 const MMatrix rotateMatrix = rotationMatrixFn.asMatrix();
                 
+                const Plane upperBellPlane(bell_translate + bellAxis, bellNormal);
+
                 // bell top deformation
                 tbb::parallel_for(tbb::blocked_range<int>(bellSubdivision + 1, bellPoints.length()), [&](tbb::blocked_range<int>& r)
                     {
@@ -391,7 +355,13 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                             {
                                 weight = (weight - falloff) / (1.0 - falloff);
                                 const MPoint rp = bellPoints[i] * rotateMatrixInverse * rotateMatrix;
-                                bellPoints[i] = rp * weight + bellPoints[i] * (1.0 - weight);
+
+                                // constrain by upper plane
+                                MPoint p = rp;
+                                if (upperBellPlane.distance(rp) > 0)
+                                    p = upperBellPlane.projectPoint(rp);
+          
+                                bellPoints[i] = p * weight + bellPoints[i] * (1.0 - weight);
                             }
                         }
                     });
@@ -400,7 +370,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
             drawData.collisionPointBellList.push_back(collisionPointBell);
         }
 
-        ringMeshList.push_back(ringMesh);
+        ringMeshList.push_back(makeBellMesh(ringMatrix, 1, ringSubdivision, 1)); // Y axis
         bellPointsList.push_back(bellPoints);
     }
 
