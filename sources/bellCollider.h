@@ -30,15 +30,10 @@ public:
 
 	static MObject attr_bellMatrix;
 	static MObject attr_ringMatrix;
-	static MObject attr_bellAxis;
-	static MObject attr_ringAxis;
 	static MObject attr_bellSubdivision;
 	static MObject attr_ringSubdivision;
 	static MObject attr_bellBottomRadius;
-	static MObject attr_falloffMode;
 	static MObject attr_falloff;
-	static MObject attr_falloffMaxDistance;
-	static MObject attr_distancePower;
 	static MObject attr_positionCount;
 	static MObject attr_drawColor;
 	static MObject attr_drawOpacity;

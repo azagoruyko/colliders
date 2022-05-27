@@ -66,6 +66,18 @@ inline MMatrix& set_maxis(MMatrix& mat, unsigned int a, const MVector& v)
     return mat;
 }
 
+inline MVector mscale(const MMatrix& mat)
+{
+    return MVector(maxis(mat, 0).length(), maxis(mat, 1).length(), maxis(mat, 2).length());
+}
+
+inline void set_mscale(MMatrix& mat, const MVector& scale)
+{
+    set_maxis(mat, 0, maxis(mat, 0).normal() * scale.x);
+    set_maxis(mat, 1, maxis(mat, 1).normal() * scale.y);
+    set_maxis(mat, 2, maxis(mat, 2).normal() * scale.z);
+}
+
 inline MPointArray findSphereLineIntersection(const MPoint &linePoint, const MVector &lineDirection, const MPoint &sphereCenter, double sphereRadius)
 {
     MVector lineVector = lineDirection.normal();

@@ -29,8 +29,6 @@
 
 #include <tbb/parallel_for.h>
 
-#include <mytona_mtypeids.h>
-
 #include "planeCollider.h"
 #include "utils.hpp"
 
