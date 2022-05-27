@@ -1,8 +1,8 @@
 # Colliders
 
-My implementation of Bell Collider. It supports multiple rings and viewport 2.0 debug drawing. It uses mesh intersection approach.
+My implementation of Bell Collider. It supports multiple rings and viewport 2.0 debug drawing. 
 
-![bell](https://user-images.githubusercontent.com/9614751/159114116-ec6ac52e-00fd-41e1-8475-8e068ed21467.PNG)
+![bell](https://user-images.githubusercontent.com/9614751/170646159-575afcd8-76b3-47cb-ad13-65deb6a56942.PNG)
 
 Youtube: https://www.youtube.com/watch?v=89Dbd-n8EzY
 
