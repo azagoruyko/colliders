@@ -34,6 +34,7 @@ public:
 	static MObject attr_ringSubdivision;
 	static MObject attr_bellBottomRadius;
 	static MObject attr_falloff;
+	static MObject attr_collision;
 	static MObject attr_positionCount;
 	static MObject attr_drawColor;
 	static MObject attr_drawOpacity;

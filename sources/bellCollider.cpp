@@ -45,6 +45,7 @@ MObject BellCollider::attr_bellSubdivision;
 MObject BellCollider::attr_ringSubdivision;
 MObject BellCollider::attr_bellBottomRadius;
 MObject BellCollider::attr_falloff;
+MObject BellCollider::attr_collision;
 MObject BellCollider::attr_positionCount;
 MObject BellCollider::attr_drawColor;
 MObject BellCollider::attr_drawOpacity;
@@ -247,6 +248,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
 
     const float bellBottomRadius = dataBlock.inputValue(attr_bellBottomRadius).asFloat();
     const float falloff = dataBlock.inputValue(attr_falloff).asFloat();
+    const float collision = dataBlock.inputValue(attr_collision).asFloat();
     const int positionCount = dataBlock.inputValue(attr_positionCount).asInt();
 
     auto outputPositionsHandle = dataBlock.outputArrayValue(attr_outputPositions);
@@ -328,10 +330,9 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
             else
                 MGlobal::displayError(MFnDependencyNode(thisMObject()).name() + ": no hits with ringMatrix[" + MSTR(i) + "]");            
 
-            const bool collisionOccured = bellPlane.distance(collisionPointRing) < bellPlane.distance(collisionPointBell);
-            if (collisionOccured)
-            {     
-                
+            const double collisionDelta = (bellPlane.distance(collisionPointRing) - bellPlane.distance(collisionPointBell)) / bellAxis.length();
+            if (collisionDelta < 0)
+            {                 
                 MTransformationMatrix rotationMatrixFn;
                 rotationMatrixFn.setTranslation(ring_translate, MSpace::kWorld);
                 const MMatrix rotateMatrixInverse = rotationMatrixFn.asMatrixInverse();
@@ -347,21 +348,35 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                     {
                         for (auto i = r.begin(); i != r.end(); i++)
                         {
-                            const MVector offset_proj = bellPlane.projectPoint(bellPoints[i]) * bellMatrixInverse - ring_translate_proj * bellMatrixInverse;
+                            const MPoint bellPoint_proj = bellPlane.projectPoint(bellPoints[i]);
+                            const MVector offset_proj = bellPoint_proj * bellMatrixInverse - ring_translate_proj * bellMatrixInverse;
 
                             double weight = offset_proj.normal() * (ringDirection_proj * bellMatrixInverse).normal(); // -1..1
 
                             if (weight > falloff)
                             {
                                 weight = (weight - falloff) / (1.0 - falloff);
+
                                 const MPoint rp = bellPoints[i] * rotateMatrixInverse * rotateMatrix;
 
                                 // constrain by upper plane
                                 MPoint p = rp;
                                 if (upperBellPlane.distance(rp) > 0)
                                     p = upperBellPlane.projectPoint(rp);
-          
+
                                 bellPoints[i] = p * weight + bellPoints[i] * (1.0 - weight);
+
+                                // ring collision
+                                if (collision > 1e-3)
+                                {
+                                    const MVector vec = ringPlane.projectPoint(bellPoints[i]) - ring_translate;
+
+                                    const double delta = vec.length() / (vec * ringMatrixInverse).length();
+                                    const MVector vec_proj_scaled = vec.normal() * delta; // scale vector
+
+                                    if (vec_proj_scaled.length() > vec.length())
+                                        bellPoints[i] += vec.normal() * (vec_proj_scaled.length() - vec.length()) * collision;
+                                }
                             }
                         }
                     });
@@ -409,7 +424,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
         }
     });
 
-    bellMeshFn.setPoints(outBellPoints);
+    bellMeshFn.setPoints(outBellPoints);    
 
     drawData.bellMesh = bellMesh;
     drawData.ringMeshList = ringMeshList;
@@ -518,6 +533,12 @@ MStatus BellCollider::initialize()
     nAttr.setKeyable(true);
     addAttribute(attr_falloff);
 
+    attr_collision = nAttr.create("collision", "collision", MFnNumericData::kFloat, 0);
+    nAttr.setMin(0);
+    nAttr.setMax(1);
+    nAttr.setKeyable(true);
+    addAttribute(attr_collision);
+
     attr_drawColor = nAttr.create("drawColor", "drawColor", MFnNumericData::k3Double);
     nAttr.setDefault(0.0, 0.01, 0.11);
     nAttr.setMin(0, 0, 0);
@@ -556,6 +577,7 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_ringSubdivision, attr_outputPositions);
     attributeAffects(attr_bellBottomRadius, attr_outputPositions);
     attributeAffects(attr_falloff, attr_outputPositions);
+    attributeAffects(attr_collision, attr_outputPositions);
     attributeAffects(attr_positionCount, attr_outputPositions);
     attributeAffects(attr_drawColor, attr_outputPositions);
     attributeAffects(attr_drawOpacity, attr_outputPositions);
@@ -566,6 +588,7 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_ringSubdivision, attr_outputRotations);
     attributeAffects(attr_bellBottomRadius, attr_outputRotations);
     attributeAffects(attr_falloff, attr_outputRotations);
+    attributeAffects(attr_collision, attr_outputRotations);
     attributeAffects(attr_positionCount, attr_outputRotations);
     attributeAffects(attr_drawColor, attr_outputRotations);
     attributeAffects(attr_drawOpacity, attr_outputRotations);
@@ -576,6 +599,7 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_ringSubdivision, attr_outputCurve);
     attributeAffects(attr_bellBottomRadius, attr_outputCurve);
     attributeAffects(attr_falloff, attr_outputCurve);
+    attributeAffects(attr_collision, attr_outputCurve);
     attributeAffects(attr_drawColor, attr_outputCurve);
     attributeAffects(attr_drawOpacity, attr_outputCurve);
 
