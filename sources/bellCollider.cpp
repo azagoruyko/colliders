@@ -332,7 +332,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
 
             const double collisionDelta = (bellPlane.distance(collisionPointRing) - bellPlane.distance(collisionPointBell)) / bellAxis.length();
             if (collisionDelta < 0)
-            {                 
+            {
                 MTransformationMatrix rotationMatrixFn;
                 rotationMatrixFn.setTranslation(ring_translate, MSpace::kWorld);
                 const MMatrix rotateMatrixInverse = rotationMatrixFn.asMatrixInverse();
@@ -340,7 +340,7 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                 const MQuaternion quat(collisionPointBell - ring_translate, collisionPointRing - ring_translate); // rotate X to final point
                 rotationMatrixFn.rotateBy(quat, MSpace::kTransform);
                 const MMatrix rotateMatrix = rotationMatrixFn.asMatrix();
-                
+
                 const Plane upperBellPlane(bell_translate + bellAxis, bellNormal);
 
                 // bell top deformation
@@ -364,26 +364,30 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
                                 if (upperBellPlane.distance(rp) > 0)
                                     p = upperBellPlane.projectPoint(rp);
 
-                                bellPoints[i] = p * weight + bellPoints[i] * (1.0 - weight);
-
-                                // ring collision
-                                if (collision > 1e-3)
-                                {
-                                    const MVector vec = ringPlane.projectPoint(bellPoints[i]) - ring_translate;
-
-                                    const double delta = vec.length() / (vec * ringMatrixInverse).length();
-                                    const MVector vec_proj_scaled = vec.normal() * delta; // scale vector
-
-                                    if (vec_proj_scaled.length() > vec.length())
-                                        bellPoints[i] += vec.normal() * (vec_proj_scaled.length() - vec.length()) * collision;
-                                }
+                                bellPoints[i] = p * weight + bellPoints[i] * (1.0 - weight);                               
                             }
                         }
                     });
-            }            
+            }
 
             drawData.collisionPointBellList.push_back(collisionPointBell);
         }
+
+        // ring collision
+        if (collision > 1e-5)
+            tbb::parallel_for(tbb::blocked_range<int>(bellSubdivision + 1, bellPoints.length()), [&](tbb::blocked_range<int>& r)
+                {
+                    for (auto i = r.begin(); i != r.end(); i++)
+                    {                    
+                        const MVector vec = ringPlane.projectPoint(bellPoints[i]) - ring_translate;
+
+                        const double delta = vec.length() / (vec * ringMatrixInverse).length();
+                        const MVector vec_proj_scaled = vec.normal() * delta; // scale vector
+
+                        if (vec_proj_scaled.length() > vec.length())
+                            bellPoints[i] += vec.normal() * (vec_proj_scaled.length() - vec.length()) * collision;
+                     }
+                });
 
         ringMeshList.push_back(makeBellMesh(ringMatrix, 1, ringSubdivision, 1)); // Y axis
         bellPointsList.push_back(bellPoints);
