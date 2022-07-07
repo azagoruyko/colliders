@@ -16,7 +16,7 @@ import pymel.core as pm
 
 name = "test"
 numRings = 2
-numOutJoints = 6
+numOutJoints = 0
 
 grp = pm.createNode("transform", n=name+"_bellCollider_group")
 grp.addAttr("scaleFactor", min=0.001, dv=1, k=True)
@@ -45,13 +45,17 @@ for i in range(numRings):
 
 curve = pm.createNode("nurbsCurve", n=name+"_bellCollider_curveShape")
 curve.getParent().rename(name+"_bellCollider_curve")
-grp | curve
+grp | curve.getParent()
 bellCollider.outputCurve >> curve.create
 
-if numOutJoints > 0:
-    bellCollider.positionCount.set(numOutJoints)
-    for i in range(numOutJoints):
-        tr = pm.createNode("transform", n=name+"_"+str(i+1)+"_transform", p=grp)
-        bellCollider.outputPositions[i] >> tr.t
-        bellCollider.outputRotations[i] >> tr.r
+bellMesh = pm.createNode("mesh", n=name+"_bellCollider_mesh")
+bellMesh.getParent().rename(name+"_bellCollider_mesh")
+grp | bellMesh.getParent()
+bellCollider.outputBellMesh >> bellMesh.inMesh
+
+bellCollider.positionCount.set(numOutJoints)
+for i in range(numOutJoints):
+    tr = pm.createNode("transform", n=name+"_"+str(i+1)+"_transform", p=grp)
+    bellCollider.outputPositions[i] >> tr.t
+    bellCollider.outputRotations[i] >> tr.r
 ```
