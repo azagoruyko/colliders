@@ -41,6 +41,7 @@ public:
 	static MObject attr_outputPositions;
 	static MObject attr_outputRotations;
 	static MObject attr_outputCurve;
+	static MObject attr_outputBellMesh;
 
 	DrawData drawData;
 

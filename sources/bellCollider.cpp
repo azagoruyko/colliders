@@ -52,6 +52,7 @@ MObject BellCollider::attr_drawOpacity;
 MObject BellCollider::attr_outputPositions;
 MObject BellCollider::attr_outputRotations;
 MObject BellCollider::attr_outputCurve;
+MObject BellCollider::attr_outputBellMesh;
 
 MString BellCollider::drawDbClassification = "drawdb/geometry/bellCollider";
 MString BellCollider::drawRegistrantId = "collidersPlugin";
@@ -232,7 +233,7 @@ MObject makeBellCurve(const MPointArray &points, int bellSubdivision, bool use_b
 
 MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
 {
-    if (plug != attr_outputPositions && plug != attr_outputRotations && plug != attr_outputCurve)
+    if (plug != attr_outputPositions && plug != attr_outputRotations && plug != attr_outputCurve && plug != attr_outputBellMesh)
         return MS::kFailure;
 
     const MMatrix bellMatrix = dataBlock.inputValue(attr_bellMatrix).asMatrix();
@@ -492,9 +493,11 @@ MStatus BellCollider::compute(const MPlug &plug, MDataBlock &dataBlock)
     outputRotationsHandle.setClean();
     outputRotationsHandle.setAllClean();
 
-    dataBlock.outputValue(attr_outputCurve).setMObject(outCurve);    
+    dataBlock.outputValue(attr_outputCurve).setMObject(outCurve);
+    dataBlock.outputValue(attr_outputBellMesh).setMObject(bellMesh);
 
-    dataBlock.setClean(attr_outputCurve);       
+    dataBlock.setClean(attr_outputCurve);
+    dataBlock.setClean(attr_outputBellMesh);
     dataBlock.setClean(attr_outputPositions);    
 
 	return MS::kSuccess;
@@ -557,7 +560,7 @@ MStatus BellCollider::initialize()
     addAttribute(attr_drawOpacity);
 
     attr_positionCount = nAttr.create("positionCount", "positionCount", MFnNumericData::kInt, 6);
-    nAttr.setMin(2);
+    nAttr.setMin(0);
     nAttr.setChannelBox(true);
     addAttribute(attr_positionCount);
 
@@ -574,6 +577,10 @@ MStatus BellCollider::initialize()
     attr_outputCurve = tAttr.create("outputCurve", "outputCurve", MFnData::kNurbsCurve);
     tAttr.setHidden(true);
     addAttribute(attr_outputCurve);
+
+    attr_outputBellMesh = tAttr.create("outputBellMesh", "outputBellMesh", MFnData::kMesh);
+    tAttr.setHidden(true);
+    addAttribute(attr_outputBellMesh);
 
     attributeAffects(attr_bellMatrix, attr_outputPositions);
     attributeAffects(attr_ringMatrix, attr_outputPositions);
@@ -606,6 +613,16 @@ MStatus BellCollider::initialize()
     attributeAffects(attr_collision, attr_outputCurve);
     attributeAffects(attr_drawColor, attr_outputCurve);
     attributeAffects(attr_drawOpacity, attr_outputCurve);
+
+    attributeAffects(attr_bellMatrix, attr_outputBellMesh);
+    attributeAffects(attr_ringMatrix, attr_outputBellMesh);
+    attributeAffects(attr_bellSubdivision, attr_outputBellMesh);
+    attributeAffects(attr_ringSubdivision, attr_outputBellMesh);
+    attributeAffects(attr_bellBottomRadius, attr_outputBellMesh);
+    attributeAffects(attr_falloff, attr_outputBellMesh);
+    attributeAffects(attr_collision, attr_outputBellMesh);
+    attributeAffects(attr_drawColor, attr_outputBellMesh);
+    attributeAffects(attr_drawOpacity, attr_outputBellMesh);
 
     return MS::kSuccess;
 }
