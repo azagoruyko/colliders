@@ -2,6 +2,8 @@
 
 #include <maya/MPoint.h>
 
+#define RAD2DEG 57.2958
+#define DEG2RAD 0.0174532862
 #define MSTR(v) MString(to_string(v).c_str())
 
 class Plane
@@ -56,7 +58,7 @@ inline MVector maxis(const MMatrix& mat, unsigned int index) { return MVector(ma
 inline MVector xaxis(const MMatrix &mat) { return maxis(mat, 0); }
 inline MVector yaxis(const MMatrix& mat) { return maxis(mat, 1); }
 inline MVector zaxis(const MMatrix& mat) { return maxis(mat, 2); }
-inline MPoint taxis(const MMatrix& mat) { return maxis(mat, 3); }
+inline MPoint taxis(const MMatrix& mat) { return MPoint(maxis(mat, 3)); }
 
 inline MMatrix& set_maxis(MMatrix& mat, unsigned int a, const MVector& v)
 {
@@ -82,16 +84,15 @@ inline MPointArray findSphereLineIntersection(const MPoint &linePoint, const MVe
 {
     MVector lineVector = lineDirection.normal();
 
-    double a = pow(lineVector.x, 2) + pow(lineVector.y, 2) + pow(lineVector.z, 2);
     double b = 2 * (lineVector.x * (linePoint.x - sphereCenter.x) + lineVector.y * (linePoint.y - sphereCenter.y) + lineVector.z * (linePoint.z - sphereCenter.z));
     double c = pow(linePoint.x - sphereCenter.x, 2) + pow(linePoint.y - sphereCenter.y, 2) + pow(linePoint.z - sphereCenter.z, 2) - pow(sphereRadius, 2);
 
-    double delta = pow(b, 2) - 4 * a * c;
+    double delta = pow(b, 2) - 4 * c;
     if (delta <= 0) // when 0 or 1 intersection found
         return MPointArray();
 
-    double d1 = (-b + sqrt(delta)) / 2.0 * a;
-    double d2 = (-b - sqrt(delta)) / 2.0 * a;
+    double d1 = (-b + sqrt(delta)) / 2.0;
+    double d2 = (-b - sqrt(delta)) / 2.0;
 
     MPoint p1(linePoint.x + lineVector.x * d1,
         linePoint.y + lineVector.y * d1,

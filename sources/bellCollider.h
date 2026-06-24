@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 
+#include "bellColliderSolver.h"
+
 using namespace std;
 
 struct DrawData
@@ -35,22 +37,15 @@ public:
 	static MObject attr_bellBottomRadius;
 	static MObject attr_falloff;
 	static MObject attr_collision;
-	static MObject attr_positionCount;
 	static MObject attr_drawColor;
 	static MObject attr_drawOpacity;
-	static MObject attr_outputPositions;
-	static MObject attr_outputRotations;
 	static MObject attr_outputCurve;
 	static MObject attr_outputBellMesh;
-
-	DrawData drawData;
 
 	static void* creator() { return new BellCollider(); }
 	static MStatus initialize();
 
 	MStatus compute(const MPlug&, MDataBlock&);
-
-	void drawUI(MHWRender::MUIDrawManager&);
 
 private:
 };
@@ -58,8 +53,8 @@ private:
 class BellColliderDrawData : public MUserData
 {
 public:
-	BellColliderDrawData() : MUserData(false) {} // deleteAfterUse = false
-	BellCollider* bellCollider{nullptr};
+	BellColliderDrawData() : MUserData() {}
+	DrawData drawData;
 };
 
 class BellColliderDrawOverride : public MHWRender::MPxDrawOverride
@@ -73,9 +68,6 @@ public:
 
 	virtual bool hasUIDrawables() const { return true; }
 	virtual void addUIDrawables(const MDagPath& objPath, MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext, const MUserData* data);
-
-	//bool isBounded(const MDagPath &objPath, const MDagPath &cameraPath) const	{return true;}
-	//MBoundingBox boundingBox(const MDagPath &objPath, const MDagPath &cameraPath) const {return MBoundingBox();}
 
 private:
 	BellColliderDrawOverride(const MObject& obj) : MHWRender::MPxDrawOverride(obj, NULL, true) {} // alwaysDirty is true

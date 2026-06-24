@@ -31,14 +31,10 @@ public:
 	static MObject attr_drawOpacity;
 	static MObject attr_outputPosition;
 
-	PlaneDrawData drawData;
-
 	static void* creator() { return new PlaneCollider(); }
 	static MStatus initialize();
 
 	MStatus compute(const MPlug&, MDataBlock&);
-
-	void drawUI(MHWRender::MUIDrawManager&);
 
 private:
 };
@@ -46,8 +42,8 @@ private:
 class PlaneColliderDrawData : public MUserData
 {
 public:
-	PlaneColliderDrawData() : MUserData(false) {} // deleteAfterUse = false
-	PlaneCollider* PlaneCollider{ nullptr };
+	PlaneColliderDrawData() : MUserData() {}
+	PlaneDrawData drawData;
 };
 
 class PlaneColliderDrawOverride : public MHWRender::MPxDrawOverride
@@ -61,9 +57,6 @@ public:
 
 	virtual bool hasUIDrawables() const { return true; }
 	virtual void addUIDrawables(const MDagPath& objPath, MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext, const MUserData* data);
-
-	//bool isBounded(const MDagPath &objPath, const MDagPath &cameraPath) const	{return true;}
-	//MBoundingBox boundingBox(const MDagPath &objPath, const MDagPath &cameraPath) const {return MBoundingBox();}
 
 private:
 	PlaneColliderDrawOverride(const MObject& obj) : MHWRender::MPxDrawOverride(obj, NULL, true) {} // alwaysDirty is true

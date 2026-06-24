@@ -29,11 +29,10 @@
 
 #include <tbb/parallel_for.h>
 
+#include <maya/MFnMatrixData.h>
+
 #include "planeCollider.h"
 #include "utils.hpp"
-
-#define RAD2DEG 57.2958
-#define DEG2RAD 0.0174532862
 
 using namespace std;
 
@@ -62,9 +61,6 @@ MStatus PlaneCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
 
     const MVector inputPosition = dataBlock.inputValue(attr_inputPosition).asVector();
 
-    const MVector color = dataBlock.inputValue(attr_drawColor).asVector();
-    const float drawOpacity = dataBlock.inputValue(attr_drawOpacity).asFloat();
-
     Plane plane(maxis(planeMatrix, 3), NORMAL_AXIS_SIGN * maxis(planeMatrix, NORMAL_AXIS_INDEX));
 
     MPoint outputPosition = inputPosition;
@@ -74,12 +70,6 @@ MStatus PlaneCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
     dataBlock.outputValue(attr_outputPosition).setMVector(outputPosition);
 
     dataBlock.setClean(attr_outputPosition);
-
-    // set draw data
-    drawData.color = MColor(color.x, color.y, color.z, drawOpacity);
-    drawData.planeCenter = plane.orig;
-    drawData.planeNormal = plane.normal;
-    drawData.size = maxis(planeMatrix, NORMAL_AXIS_INDEX).length();
 
     return MS::kSuccess;
 }
@@ -134,16 +124,6 @@ MStatus PlaneCollider::initialize()
     return MS::kSuccess;
 }
 
-void PlaneCollider::drawUI(MHWRender::MUIDrawManager& drawManager)
-{
-    drawManager.setColor(drawData.color);
-    
-    drawManager.circle(drawData.planeCenter, drawData.planeNormal, drawData.size, true);
-    drawManager.setLineWidth(3);
-    drawManager.setColor(drawData.color*0.25);
-    drawManager.line(drawData.planeCenter, drawData.planeCenter + drawData.planeNormal * drawData.size);
-}
-
 MUserData* PlaneColliderDrawOverride::prepareForDraw(
     const MDagPath& objPath,
     const MDagPath& cameraPath,
@@ -161,8 +141,42 @@ MUserData* PlaneColliderDrawOverride::prepareForDraw(
     if (!data)
         data = new PlaneColliderDrawData();
 
-    MFnDependencyNode locatorFn(obj);
-    data->PlaneCollider = dynamic_cast<PlaneCollider*>(locatorFn.userNode());
+    MPlug planeMatrixPlug(obj, PlaneCollider::attr_planeMatrix);
+    MPlug normalAxisPlug(obj, PlaneCollider::attr_normalAxis);
+    MPlug drawColorPlug(obj, PlaneCollider::attr_drawColor);
+    MPlug drawOpacityPlug(obj, PlaneCollider::attr_drawOpacity);
+
+    MMatrix planeMatrix;
+    MObject matrixObj;
+    if (planeMatrixPlug.getValue(matrixObj) == MS::kSuccess)
+    {
+        MFnMatrixData matrixData(matrixObj);
+        planeMatrix = matrixData.matrix();
+    }
+
+    short normalAxis = 1;
+    normalAxisPlug.getValue(normalAxis);
+
+    double rVal = 0.0, gVal = 0.01, bVal = 0.11;
+    if (drawColorPlug.numChildren() == 3)
+    {
+        drawColorPlug.child(0).getValue(rVal);
+        drawColorPlug.child(1).getValue(gVal);
+        drawColorPlug.child(2).getValue(bVal);
+    }
+
+    float drawOpacity = 0.3f;
+    drawOpacityPlug.getValue(drawOpacity);
+
+    const int NORMAL_AXIS_INDEX = normalAxis < 3 ? normalAxis : normalAxis - 3;
+    const int NORMAL_AXIS_SIGN = normalAxis > 2 ? -1 : 1;
+
+    Plane plane(taxis(planeMatrix), NORMAL_AXIS_SIGN * maxis(planeMatrix, NORMAL_AXIS_INDEX));
+
+    data->drawData.color = MColor(rVal, gVal, bVal, drawOpacity);
+    data->drawData.planeCenter = plane.orig;
+    data->drawData.planeNormal = plane.normal;
+    data->drawData.size = maxis(planeMatrix, NORMAL_AXIS_INDEX).length();
 
     return data;
 }
@@ -175,10 +189,14 @@ void PlaneColliderDrawOverride::addUIDrawables(
 {
     auto* PlaneColliderData = dynamic_cast<const PlaneColliderDrawData*>(data);
 
-    if (PlaneColliderData && PlaneColliderData->PlaneCollider)
+    if (PlaneColliderData)
     {
         drawManager.beginDrawable();
-        PlaneColliderData->PlaneCollider->drawUI(drawManager);
+        drawManager.setColor(PlaneColliderData->drawData.color);
+        drawManager.circle(PlaneColliderData->drawData.planeCenter, PlaneColliderData->drawData.planeNormal, PlaneColliderData->drawData.size, true);
+        drawManager.setLineWidth(3);
+        drawManager.setColor(PlaneColliderData->drawData.color * 0.25);
+        drawManager.line(PlaneColliderData->drawData.planeCenter, PlaneColliderData->drawData.planeCenter + PlaneColliderData->drawData.planeNormal * PlaneColliderData->drawData.size);
         drawManager.endDrawable();
     }
 }
