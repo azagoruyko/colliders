@@ -1,8 +1,8 @@
 # Colliders
 
-My implementation of Bell Collider and Skirt Bell Collider for long/short skirts. 
+My implementation of `Bell Collider` as well as custom `Skirt Bell Collider` for skirts.
 
-![bell](https://user-images.githubusercontent.com/9614751/170646159-575afcd8-76b3-47cb-ad13-65deb6a56942.PNG)
+<img width="977" height="550" alt="image" src="https://github.com/user-attachments/assets/922bf5db-6b6c-40f4-8ed8-0e4748e0cf30" />
 
 Youtube: https://www.youtube.com/watch?v=89Dbd-n8EzY
 
