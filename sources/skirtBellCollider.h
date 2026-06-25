@@ -46,6 +46,7 @@ public:
     static MObject attr_ringSubdivision;
     static MObject attr_falloff;
     static MObject attr_collision;
+    static MObject attr_tightness;
     static MObject attr_bellScaleRamp;
     static MObject attr_leftRingAxis;
     static MObject attr_rightRingAxis;

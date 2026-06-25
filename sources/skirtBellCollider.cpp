@@ -57,6 +57,7 @@ MObject SkirtBellCollider::attr_bellSubdivision;
 MObject SkirtBellCollider::attr_ringSubdivision;
 MObject SkirtBellCollider::attr_falloff;
 MObject SkirtBellCollider::attr_collision;
+MObject SkirtBellCollider::attr_tightness;
 MObject SkirtBellCollider::attr_bellScaleRamp;
 MObject SkirtBellCollider::attr_leftRingAxis;
 MObject SkirtBellCollider::attr_rightRingAxis;
@@ -69,14 +70,15 @@ static MPointArray getCurvePoints(const MPointArray& points, int bellSubdivision
     MPointArray cvs;
     int start = use_bottom ? 1 : bellSubdivision + 1;
     int count = bellSubdivision;
+    cvs.setLength(count + 3);
     for (int i = 0; i < count; i++)
     {
-        cvs.append(points[start + i]);
+        cvs.set(points[start + i], i);
     }
     // Overlap the first 3 CVs for cubic periodic continuity
-    cvs.append(cvs[0]);
-    cvs.append(cvs[1]);
-    cvs.append(cvs[2]);
+    cvs.set(cvs[0], count);
+    cvs.set(cvs[1], count + 1);
+    cvs.set(cvs[2], count + 2);
     return cvs;
 }
 
@@ -278,6 +280,13 @@ MStatus SkirtBellCollider::initialize()
     nAttr.setKeyable(true);
     addAttribute(attr_collision);
 
+    // Tightness
+    attr_tightness = nAttr.create("tightness", "tightness", MFnNumericData::kFloat, 0.5f);
+    nAttr.setMin(0.0f);
+    nAttr.setMax(1.0f);
+    nAttr.setKeyable(true);
+    addAttribute(attr_tightness);
+
     // Bell Scale Ramp (Curve)
     attr_bellScaleRamp = MRampAttribute::createCurveRamp("bellScaleRamp", "bellScaleRamp");
     addAttribute(attr_bellScaleRamp);
@@ -322,25 +331,16 @@ MStatus SkirtBellCollider::initialize()
     addAttribute(attr_outputSurface);
 
     // Set up attribute affects relationships
-    attributeAffects(attr_bellMatrix, attr_outputSurface);
-    attributeAffects(attr_leftHipMatrix, attr_outputSurface);
-    attributeAffects(attr_leftKneeMatrix, attr_outputSurface);
-    attributeAffects(attr_leftHeelMatrix, attr_outputSurface);
-    attributeAffects(attr_rightHipMatrix, attr_outputSurface);
-    attributeAffects(attr_rightKneeMatrix, attr_outputSurface);
-    attributeAffects(attr_rightHeelMatrix, attr_outputSurface);
-    attributeAffects(attr_skirtType, attr_outputSurface);
-    attributeAffects(attr_height, attr_outputSurface);
-    attributeAffects(attr_ringScale, attr_outputSurface);
-    attributeAffects(attr_bellScale, attr_outputSurface);
-    attributeAffects(attr_bellSubdivision, attr_outputSurface);
-    attributeAffects(attr_ringSubdivision, attr_outputSurface);
-    attributeAffects(attr_falloff, attr_outputSurface);
-    attributeAffects(attr_collision, attr_outputSurface);
-    attributeAffects(attr_bellScaleRamp, attr_outputSurface);
-    attributeAffects(attr_leftRingAxis, attr_outputSurface);
-    attributeAffects(attr_rightRingAxis, attr_outputSurface);
-    attributeAffects(attr_bellAxis, attr_outputSurface);
+    const MObject affects[] = {
+        attr_bellMatrix, attr_leftHipMatrix, attr_leftKneeMatrix, attr_leftHeelMatrix,
+        attr_rightHipMatrix, attr_rightKneeMatrix, attr_rightHeelMatrix, attr_skirtType,
+        attr_height, attr_ringScale, attr_bellScale, attr_bellSubdivision, attr_ringSubdivision,
+        attr_falloff, attr_collision, attr_tightness, attr_bellScaleRamp, attr_leftRingAxis,
+        attr_rightRingAxis, attr_bellAxis
+    };
+    for (const MObject& attr : affects) {
+        attributeAffects(attr, attr_outputSurface);
+    }
 
     return MS::kSuccess;
 }
@@ -369,6 +369,7 @@ MStatus SkirtBellCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
     const int ringSubdivision = dataBlock.inputValue(attr_ringSubdivision).asInt();
     const float falloff = dataBlock.inputValue(attr_falloff).asFloat();
     const float collision = dataBlock.inputValue(attr_collision).asFloat();
+    const float tightness = dataBlock.inputValue(attr_tightness).asFloat();
     const short leftRingAxis = dataBlock.inputValue(attr_leftRingAxis).asShort();
     const short rightRingAxis = dataBlock.inputValue(attr_rightRingAxis).asShort();
     const short bellAxis = dataBlock.inputValue(attr_bellAxis).asShort();
@@ -426,21 +427,26 @@ MStatus SkirtBellCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
 
     const int N = (skirtType == 0) ? 2 : 3;
 
-    // Construct collision rings
     const MVector thighScale(ringScale.x, L_thigh * ringScale.y, ringScale.z);
     const MMatrix leftHipToKnee = createRingMatrix(leftHipMatrix, thighScale, leftRingAxis, &LK);
     const MMatrix rightHipToKnee = createRingMatrix(rightHipMatrix, thighScale, rightRingAxis, &RK);
 
     MMatrix leftHipToHeel;
     MMatrix rightHipToHeel;
+    MMatrix leftHipToKneeExtended;
+    MMatrix rightHipToKneeExtended;
     if (skirtType == 1)
     {
         const double leftLegLen = L_thigh + L_calf;
         const double rightLegLen = L_thigh + L_calf;
         const MVector leftHeelScale(ringScale.x, leftLegLen * ringScale.y, ringScale.z);
         const MVector rightHeelScale(ringScale.x, rightLegLen * ringScale.y, ringScale.z);
+        
         leftHipToHeel = createRingMatrix(leftHipMatrix, leftHeelScale, leftRingAxis, &LHe);
         rightHipToHeel = createRingMatrix(rightHipMatrix, rightHeelScale, rightRingAxis, &RHe);
+        
+        leftHipToKneeExtended = createRingMatrix(leftHipMatrix, leftHeelScale, leftRingAxis, &LK);
+        rightHipToKneeExtended = createRingMatrix(rightHipMatrix, rightHeelScale, rightRingAxis, &RK);
     }
 
     // Setup level distances along the skirt axis
@@ -526,9 +532,74 @@ MStatus SkirtBellCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
         };
         const MMatrix bellMatrix(m);
 
-        vector<MMatrix> bellRings;
-        if (i == 0 || i == 1)
+        auto solveForRings = [&](const vector<MMatrix>& rings, MPointArray& outBottom, MPointArray& outTop) -> MStatus {
+            BellColliderInputs inputs;
+            inputs.bellMatrix = bellMatrix;
+            inputs.ringMatrices = rings;
+            inputs.bellSubdivision = bellSubdivision;
+            inputs.ringSubdivision = ringSubdivision;
+            inputs.bellBottomRadius = scale_bottom / scale_top;
+            inputs.falloff = falloff;
+            inputs.collision = collision;
+
+            BellColliderOutputs outputs;
+            const MStatus solveStat = BellColliderSolver::solve(inputs, outputs);
+            if (solveStat != MS::kSuccess)
+            {
+                MGlobal::displayError("SkirtBellCollider: Solver failed at bell index " + MString(to_string(i).c_str()) + " with: " + solveStat.errorString());
+                return solveStat;
+            }
+
+            MPointArray meshPoints;
+            const MFnMesh meshFn(outputs.outputBellMeshData);
+            meshFn.getPoints(meshPoints);
+
+            if (i == 0) outBottom = getCurvePoints(meshPoints, bellSubdivision, true);
+            outTop = getCurvePoints(meshPoints, bellSubdivision, false);
+
+            return MS::kSuccess;
+        };
+
+        if (skirtType == 1 && i == 2)
         {
+            vector<MMatrix> ringsWithoutKnee;
+            ringsWithoutKnee.push_back(leftHipToHeel);
+            ringsWithoutKnee.push_back(rightHipToHeel);
+
+            vector<MMatrix> ringsWithKnee = ringsWithoutKnee;
+            ringsWithKnee.push_back(leftHipToKneeExtended);
+            ringsWithKnee.push_back(rightHipToKneeExtended);
+
+            MPointArray topWith, topWithout;
+
+            if (tightness < 1.0f) {
+                MPointArray dummy;
+                MStatus s = solveForRings(ringsWithKnee, dummy, topWith);
+                if (s != MS::kSuccess) return s;
+            }
+            if (tightness > 0.0f) {
+                MPointArray dummy;
+                MStatus s = solveForRings(ringsWithoutKnee, dummy, topWithout);
+                if (s != MS::kSuccess) return s;
+            }
+
+            if (tightness <= 0.0f) {
+                rows[i + 1] = topWith;
+            } else if (tightness >= 1.0f) {
+                rows[i + 1] = topWithout;
+            } else {
+                MPointArray blendedTop;
+                blendedTop.setLength(topWith.length());
+                for (unsigned int j = 0; j < topWith.length(); j++) {
+                    blendedTop.set(topWith[j] * (1.0 - tightness) + topWithout[j] * tightness, j);
+                }
+                rows[i + 1] = blendedTop;
+            }
+        }
+        else
+        {
+            vector<MMatrix> bellRings;
+            // For i == 0 or 1
             bellRings.push_back(leftHipToKnee);
             bellRings.push_back(rightHipToKnee);
             if (skirtType == 1)
@@ -536,45 +607,13 @@ MStatus SkirtBellCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
                 bellRings.push_back(leftHipToHeel);
                 bellRings.push_back(rightHipToHeel);
             }
+
+            MPointArray bottom, top;
+            MStatus s = solveForRings(bellRings, bottom, top);
+            if (s != MS::kSuccess) return s;
+            if (i == 0) rows[0] = bottom;
+            rows[i + 1] = top;
         }
-        else if (i == 2 && skirtType == 1)
-        {
-            bellRings.push_back(leftHipToHeel);
-            bellRings.push_back(rightHipToHeel);
-        }
-
-        // Setup solver inputs
-        BellColliderInputs inputs;
-        inputs.bellMatrix = bellMatrix;
-        inputs.ringMatrices = bellRings;
-        inputs.bellSubdivision = bellSubdivision;
-        inputs.ringSubdivision = ringSubdivision;
-        inputs.bellBottomRadius = scale_bottom / scale_top;
-        inputs.falloff = falloff;
-        inputs.collision = collision;
-
-        // Solve
-        BellColliderOutputs outputs;
-        const MStatus solveStat = BellColliderSolver::solve(inputs, outputs);
-        if (solveStat != MS::kSuccess)
-        {
-            MGlobal::displayError("SkirtBellCollider: Solver failed at bell index " + MString(to_string(i).c_str()) + " with: " + solveStat.errorString());
-            return solveStat;
-        }
-
-        // Extract points from output mesh
-        MPointArray meshPoints;
-        const MFnMesh meshFn(outputs.outputBellMeshData);
-        meshFn.getPoints(meshPoints);
-
-        // For the first bell, extract the bottom ring points
-        if (i == 0)
-        {
-            rows[0] = getCurvePoints(meshPoints, bellSubdivision, true);
-        }
-
-        // Extract top ring points
-        rows[i + 1] = getCurvePoints(meshPoints, bellSubdivision, false);
     }
 
     // Populate vKnots matching actual distance levels
@@ -595,8 +634,6 @@ MStatus SkirtBellCollider::compute(const MPlug& plug, MDataBlock& dataBlock)
             controlPoints.set(rows[v][numU - 1 - u], u * numV + v);
         }
     }
-
-
 
     // Create NURBS surface
     MFnNurbsSurfaceData surfaceDataFn;
@@ -658,40 +695,28 @@ MUserData* SkirtBellColliderDrawOverride::prepareForDraw(
     data->drawData.ringMatrices.clear();
 
     // Extract attributes
-    MPlug leftHipMatrixPlug(obj, SkirtBellCollider::attr_leftHipMatrix);
-    MPlug leftKneeMatrixPlug(obj, SkirtBellCollider::attr_leftKneeMatrix);
-    MPlug leftHeelMatrixPlug(obj, SkirtBellCollider::attr_leftHeelMatrix);
-    MPlug rightHipMatrixPlug(obj, SkirtBellCollider::attr_rightHipMatrix);
-    MPlug rightKneeMatrixPlug(obj, SkirtBellCollider::attr_rightKneeMatrix);
-    MPlug rightHeelMatrixPlug(obj, SkirtBellCollider::attr_rightHeelMatrix);
-    MPlug skirtTypePlug(obj, SkirtBellCollider::attr_skirtType);
-    MPlug ringScalePlug(obj, SkirtBellCollider::attr_ringScale);
-    MPlug ringSubdivisionPlug(obj, SkirtBellCollider::attr_ringSubdivision);
-    MPlug leftRingAxisPlug(obj, SkirtBellCollider::attr_leftRingAxis);
-    MPlug rightRingAxisPlug(obj, SkirtBellCollider::attr_rightRingAxis);
+    auto getMatrix = [&obj](const MObject& attr, MMatrix& outMat) {
+        MPlug plug(obj, attr);
+        MObject tempObj;
+        if (plug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
+            outMat = MFnMatrixData(tempObj).matrix();
+    };
 
     MMatrix leftHipMatrix, leftKneeMatrix, leftHeelMatrix;
     MMatrix rightHipMatrix, rightKneeMatrix, rightHeelMatrix;
-    MObject tempObj;
 
-    if (leftHipMatrixPlug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
-        leftHipMatrix = MFnMatrixData(tempObj).matrix();
-    if (leftKneeMatrixPlug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
-        leftKneeMatrix = MFnMatrixData(tempObj).matrix();
-    if (leftHeelMatrixPlug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
-        leftHeelMatrix = MFnMatrixData(tempObj).matrix();
-
-    if (rightHipMatrixPlug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
-        rightHipMatrix = MFnMatrixData(tempObj).matrix();
-    if (rightKneeMatrixPlug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
-        rightKneeMatrix = MFnMatrixData(tempObj).matrix();
-    if (rightHeelMatrixPlug.getValue(tempObj) == MS::kSuccess && !tempObj.isNull())
-        rightHeelMatrix = MFnMatrixData(tempObj).matrix();
+    getMatrix(SkirtBellCollider::attr_leftHipMatrix, leftHipMatrix);
+    getMatrix(SkirtBellCollider::attr_leftKneeMatrix, leftKneeMatrix);
+    getMatrix(SkirtBellCollider::attr_leftHeelMatrix, leftHeelMatrix);
+    getMatrix(SkirtBellCollider::attr_rightHipMatrix, rightHipMatrix);
+    getMatrix(SkirtBellCollider::attr_rightKneeMatrix, rightKneeMatrix);
+    getMatrix(SkirtBellCollider::attr_rightHeelMatrix, rightHeelMatrix);
 
     short skirtType = 1;
-    skirtTypePlug.getValue(skirtType);
+    MPlug(obj, SkirtBellCollider::attr_skirtType).getValue(skirtType);
 
     MVector ringScale(0.5, 1.0, 0.5);
+    MPlug ringScalePlug(obj, SkirtBellCollider::attr_ringScale);
     if (ringScalePlug.numChildren() == 3)
     {
         double sx = 0.5, sy = 1.0, sz = 0.5;
@@ -702,14 +727,13 @@ MUserData* SkirtBellColliderDrawOverride::prepareForDraw(
     }
 
     int ringSubdivision = 16;
-    ringSubdivisionPlug.getValue(ringSubdivision);
+    MPlug(obj, SkirtBellCollider::attr_ringSubdivision).getValue(ringSubdivision);
     if (ringSubdivision < 3) ringSubdivision = 3;
     data->drawData.ringSubdivision = ringSubdivision;
 
-    short leftRingAxis = 0;
-    leftRingAxisPlug.getValue(leftRingAxis);
-    short rightRingAxis = 0;
-    rightRingAxisPlug.getValue(rightRingAxis);
+    short leftRingAxis = 0, rightRingAxis = 0;
+    MPlug(obj, SkirtBellCollider::attr_leftRingAxis).getValue(leftRingAxis);
+    MPlug(obj, SkirtBellCollider::attr_rightRingAxis).getValue(rightRingAxis);
 
     MPoint LH = taxis(leftHipMatrix);
     MPoint LK = taxis(leftKneeMatrix);
@@ -737,6 +761,7 @@ MUserData* SkirtBellColliderDrawOverride::prepareForDraw(
         double rightLegLen = rightThigh + (RHe - RK).length();
         const MVector leftHeelScale(ringScale.x, leftLegLen * ringScale.y, ringScale.z);
         const MVector rightHeelScale(ringScale.x, rightLegLen * ringScale.y, ringScale.z);
+        
         MMatrix leftHipToHeel = createRingMatrix(leftHipMatrix, leftHeelScale, leftRingAxis, &LHe);
         MMatrix rightHipToHeel = createRingMatrix(rightHipMatrix, rightHeelScale, rightRingAxis, &RHe);
 
