@@ -16,11 +16,11 @@ Youtube: https://www.youtube.com/watch?v=89Dbd-n8EzY
 You need Visual Studio and CMake to do this. 
 
 #### Using Python
-Use the script `python/colliders.py` to run the UI.
+Use the script `scripts/colliders.py` to run the UI.
 
 ```python
 import sys
-sys.path.insert(0, r"<path_to_colliders>/python")
+sys.path.insert(0, r"<path_to_colliders>/scripts")
 import colliders
 colliders.show()
 ```

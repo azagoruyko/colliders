@@ -1,0 +1,36 @@
+global proc AEbellColliderTemplate( string $nodeName )
+{
+    editorTemplate -beginScrollLayout;
+
+        editorTemplate -beginLayout "Bell Collider" -collapse 0;
+            editorTemplate -addControl "bellSubdivision";
+            editorTemplate -addControl "ringSubdivision";
+            editorTemplate -addControl "bellBottomRadius";
+            editorTemplate -addControl "falloff";
+            editorTemplate -addControl "collision";
+            
+            editorTemplate -beginLayout "Draw Attributes" -collapse 0;
+                editorTemplate -addControl "drawColor";
+                editorTemplate -addControl "drawOpacity";
+            editorTemplate -endLayout;
+        editorTemplate -endLayout;
+
+        AEdependNodeTemplate $nodeName;
+
+        // Suppress default locator attributes
+        editorTemplate -suppress "localPosition";
+        editorTemplate -suppress "localScale";
+
+        // Suppress standard node attributes
+        editorTemplate -suppress "caching";
+        editorTemplate -suppress "nodeState";
+
+        // Suppress matrix inputs/outputs
+        editorTemplate -suppress "bellMatrix";
+        editorTemplate -suppress "ringMatrix";
+        editorTemplate -suppress "outputCurve";
+        editorTemplate -suppress "outputBellMesh";
+
+    editorTemplate -addExtraControls;
+    editorTemplate -endScrollLayout;
+}

@@ -1,0 +1,46 @@
+global proc AEskirtBellColliderTemplate( string $nodeName )
+{
+    editorTemplate -beginScrollLayout;
+
+        editorTemplate -beginLayout "Skirt Bell Collider" -collapse 0;
+            editorTemplate -addControl "skirtType";
+            editorTemplate -addControl "height";
+            editorTemplate -addControl "ringScale";
+            editorTemplate -addControl "bellScale";
+            editorTemplate -addControl "bellSubdivision";
+            editorTemplate -addControl "ringSubdivision";
+            editorTemplate -addControl "falloff";
+            editorTemplate -addControl "collision";
+            editorTemplate -addControl "tightness";
+            
+            // Display as a ramp curve control instead of basic ramp attributes
+            AEaddRampControl( $nodeName + ".bellScaleRamp" );
+
+            editorTemplate -addControl "leftRingAxis";
+            editorTemplate -addControl "rightRingAxis";
+            editorTemplate -addControl "bellAxis";
+        editorTemplate -endLayout;
+
+        AEdependNodeTemplate $nodeName;
+
+        // Suppress default locator attributes
+        editorTemplate -suppress "localPosition";
+        editorTemplate -suppress "localScale";
+        
+        // Suppress standard node attributes that aren't useful in AE
+        editorTemplate -suppress "caching";
+        editorTemplate -suppress "nodeState";
+
+        // Suppress matrix inputs/outputs so they don't clutter the AE
+        editorTemplate -suppress "bellMatrix";
+        editorTemplate -suppress "leftHipMatrix";
+        editorTemplate -suppress "leftKneeMatrix";
+        editorTemplate -suppress "leftHeelMatrix";
+        editorTemplate -suppress "rightHipMatrix";
+        editorTemplate -suppress "rightKneeMatrix";
+        editorTemplate -suppress "rightHeelMatrix";
+        editorTemplate -suppress "outputSurface";
+
+    editorTemplate -addExtraControls;
+    editorTemplate -endScrollLayout;
+}
