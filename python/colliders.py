@@ -1,16 +1,3 @@
-"""
-bellCollider.py
----------------
-Maya Python UI for creating BellCollider and SkirtBellCollider nodes.
-
-Usage (Maya Script Editor):
-    import importlib, sys
-    sys.path.insert(0, r"<path_to>/python")
-    import bellCollider
-    importlib.reload(bellCollider)
-    bellCollider.show()
-"""
-
 import math
 import maya.cmds as cmds
 
