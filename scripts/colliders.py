@@ -423,7 +423,6 @@ def show():
     win = cmds.window(WINDOW_ID, title=WINDOW_TITLE,
                       widthHeight=(480, 300), sizeable=True, resizeToFitChildren=True)
 
-    cmds.scrollLayout(childResizable=True)
     tabs = cmds.tabLayout(innerMarginWidth=2, innerMarginHeight=2)
 
     tab1 = cmds.columnLayout(adjustableColumn=True)
