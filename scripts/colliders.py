@@ -418,10 +418,11 @@ class SkirtBellColliderTab:
 def show():
     """Open (or re-open) the Bell Collider Creator window."""
     if cmds.window(WINDOW_ID, exists=True):
-        cmds.deleteUI(WINDOW_ID, window=True)
+        cmds.showWindow(WINDOW_ID)
+        return
 
     win = cmds.window(WINDOW_ID, title=WINDOW_TITLE,
-                      widthHeight=(480, 300), sizeable=True, resizeToFitChildren=True)
+                      widthHeight=(480, 300), sizeable=True, resizeToFitChildren=True, ret=True)
 
     tabs = cmds.tabLayout(innerMarginWidth=2, innerMarginHeight=2)
 
@@ -438,7 +439,3 @@ def show():
                              (tab2, "Skirt Bell Collider")])
 
     cmds.showWindow(win)
-
-
-if __name__ == "__main__":
-    show()
